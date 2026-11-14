@@ -47,10 +47,18 @@ export function CartProvider({ children }) {
   useEffect(() => {
     socket.connect();
 
-    // Sync initial orders from server on connect (works across incognito & any tab)
+    // Sync initial orders from server on connect without wiping local placed orders
     socket.on('orders:sync', (serverOrders) => {
       if (serverOrders && Array.isArray(serverOrders)) {
-        setOrders(serverOrders);
+        setOrders((prev) => {
+          const serverIds = new Set(serverOrders.map((o) => o.id));
+          const localOnly = prev.filter((o) => !serverIds.has(o.id));
+          const merged = [...localOnly, ...serverOrders];
+          try {
+            localStorage.setItem('qd_orders_live', JSON.stringify(merged));
+          } catch (e) {}
+          return merged;
+        });
       }
     });
 
