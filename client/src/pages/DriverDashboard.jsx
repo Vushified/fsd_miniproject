@@ -21,7 +21,7 @@ export function DriverDashboard() {
 
   // Orders that are ready for pickup or on the way
   const availableDeliveries = orders.filter(
-    (o) => o.status === 'Packing' || o.status === 'Out for Delivery'
+    (o) => o.status === 'Placed' || o.status === 'Packing' || o.status === 'Out for Delivery'
   );
 
   const deliveredOrders = orders.filter((o) => o.status === 'Delivered');

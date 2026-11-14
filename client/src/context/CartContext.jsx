@@ -13,7 +13,10 @@ export function CartProvider({ children }) {
 
   // Stores and products state (allows live stock updates in vendor view)
   const [stores, setStores] = useState(initialStores);
-  const [products, setProducts] = useState(initialProducts);
+  const [products, setProducts] = useState(() => {
+    const saved = localStorage.getItem('qd_products_live');
+    return saved ? JSON.parse(saved) : initialProducts;
+  });
   const [orders, setOrders] = useState(() => {
     const saved = localStorage.getItem('qd_orders_live');
     return saved ? JSON.parse(saved) : initialOrders;
@@ -230,11 +233,41 @@ export function CartProvider({ children }) {
     }
   };
 
+  // Deduct inventory when vendor accepts or packs an order
+  const deductInventory = (orderItems = []) => {
+    setProducts((prev) => {
+      const updated = prev.map((prod) => {
+        const matchingItem = orderItems.find(
+          (it) => it.id === prod.id || it.name?.toLowerCase() === prod.name?.toLowerCase()
+        );
+        if (matchingItem) {
+          const qty = matchingItem.quantity || 1;
+          const currentStock = typeof prod.stock === 'number' ? prod.stock : 25;
+          const newStock = Math.max(0, currentStock - qty);
+          return {
+            ...prod,
+            stock: newStock,
+            inStock: newStock > 0,
+          };
+        }
+        return prod;
+      });
+      try {
+        localStorage.setItem('qd_products_live', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  };
+
   // Update product stock and price (Vendor Inventory View 6)
   const updateProduct = (productId, updates) => {
-    setProducts((prev) =>
-      prev.map((p) => (p.id === productId ? { ...p, ...updates } : p))
-    );
+    setProducts((prev) => {
+      const updated = prev.map((p) => (p.id === productId ? { ...p, ...updates } : p));
+      try {
+        localStorage.setItem('qd_products_live', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
   };
 
   // Vendor store status toggle (Online / Offline)
@@ -280,6 +313,7 @@ export function CartProvider({ children }) {
         setCustomerLocation,
         placeOrder,
         updateOrderStatus,
+        deductInventory,
         updateProduct,
         toggleStoreStatus,
         handleVendorApproval,

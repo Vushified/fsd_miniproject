@@ -15,13 +15,19 @@ import { useCart } from '../context/CartContext';
 // View 5: Vendor Order Page
 // Enables store owners to view and pack incoming customer orders
 export function VendorOrders({ onNavigateToInventory }) {
-  const { orders, updateOrderStatus } = useCart();
+  const { orders, updateOrderStatus, deductInventory } = useCart();
   const [selectedOrderId, setSelectedOrderId] = useState(orders[0]?.id);
 
   // Track checked items for packing per order
   const [packedItemsMap, setPackedItemsMap] = useState({});
 
   const activeOrder = orders.find((o) => o.id === selectedOrderId) || orders[0];
+
+  // Accept order and automatically deduct ordered item quantities from inventory stock
+  const handleAcceptAndPack = (order) => {
+    updateOrderStatus(order.id, 'Packing');
+    deductInventory(order.items);
+  };
 
   // Toggle item packed status in checklist
   const toggleItemPacked = (orderId, itemId) => {
@@ -162,8 +168,8 @@ export function VendorOrders({ onNavigateToInventory }) {
                 <div className="flex items-center gap-2">
                   {activeOrder.status === 'Placed' && (
                     <button
-                      onClick={() => updateOrderStatus(activeOrder.id, 'Packing')}
-                      className="px-3.5 py-1.5 bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 rounded-xl text-xs font-bold transition shadow-sm"
+                      onClick={() => handleAcceptAndPack(activeOrder)}
+                      className="px-3.5 py-1.5 bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 rounded-xl text-xs font-bold transition shadow-sm hover:opacity-90 active:scale-95"
                     >
                       Accept & Start Packing
                     </button>
