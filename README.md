@@ -123,3 +123,4 @@ git push -u origin main
 
 4. **Q: What is the benefit of using Docker Compose for this project?**
    - *A:* `docker-compose.yml` allows running the entire multi-tier system (React client, Node.js server, and MongoDB database) in isolated containers with a single command `docker compose up --build`, eliminating "it works on my machine" environment discrepancies.
+

@@ -24,3 +24,4 @@ router.route('/:id/items/:itemId/outofstock')
   .put(protect, authorize('vendor', 'admin'), markItemOutOfStock);
 
 export default router;
+

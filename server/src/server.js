@@ -38,6 +38,23 @@ app.set('socketio', io);
 io.on('connection', (socket) => {
   console.log(`[WebSocket] Client connected: ${socket.id}`);
 
+  // Broadcast order status change to all connected clients (Customer, Vendor, Driver)
+  socket.on('order:update_status', (data) => {
+    console.log(`[WebSocket] Emitting order status update: Order ${data.orderId} -> ${data.status}`);
+    io.emit('order:status_updated', data);
+  });
+
+  // Broadcast out-of-stock item & customer refund
+  socket.on('order:mark_outofstock', (data) => {
+    console.log(`[WebSocket] Emitting refund: Order ${data.orderId}`);
+    io.emit('order:refund_processed', data);
+  });
+
+  // Broadcast store online/offline status
+  socket.on('store:status_change', (data) => {
+    io.emit('store:status_changed', data);
+  });
+
   // Driver location ping event
   socket.on('driver:location_update', (data) => {
     io.emit('driver:location_changed', data);
@@ -82,3 +99,4 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`[QuickDrop Server] Running on http://localhost:${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
 });
+

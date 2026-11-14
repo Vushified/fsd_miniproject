@@ -49,26 +49,49 @@ export function CartProvider({ children }) {
       setOrders((prev) =>
         prev.map((ord) => (ord.id === data.orderId ? { ...ord, ...data.updatedOrder, status: data.status } : ord))
       );
-      if (currentTrackingOrder?.id === data.orderId) {
-        setCurrentTrackingOrder((prev) => ({ ...prev, status: data.status }));
-      }
+      setCurrentTrackingOrder((prev) => {
+        if (prev?.id === data.orderId) {
+          return { ...prev, ...data.updatedOrder, status: data.status };
+        }
+        return prev;
+      });
     });
 
     // Listen for live item refund notifications
     socket.on('order:refund_processed', (data) => {
-      if (currentTrackingOrder?.id === data.orderId) {
-        setCurrentTrackingOrder((prev) => ({
-          ...prev,
-          totalAmount: data.newTotal,
-          missingItemRefund: data.refund,
-        }));
-      }
+      setCurrentTrackingOrder((prev) => {
+        if (prev?.id === data.orderId) {
+          return {
+            ...prev,
+            totalAmount: data.newTotal,
+            missingItemRefund: data.refund,
+          };
+        }
+        return prev;
+      });
     });
 
-    // Clean up websocket listener on unmount
+    // Cross-tab real-time sync via storage event (ensures two windows update in real-time)
+    const handleStorageChange = (e) => {
+      if (e.key === 'qd_orders_live' && e.newValue) {
+        try {
+          const freshOrders = JSON.parse(e.newValue);
+          setOrders(freshOrders);
+          const activeId = currentTrackingOrder?.id;
+          const matching = freshOrders.find((o) => o.id === activeId);
+          if (matching) setCurrentTrackingOrder(matching);
+        } catch (err) {
+          console.warn('Storage sync parse error', err);
+        }
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+
+    // Clean up websocket & storage listener on unmount
     return () => {
       socket.off('order:status_updated');
       socket.off('order:refund_processed');
+      window.removeEventListener('storage', handleStorageChange);
       socket.disconnect();
     };
   }, [currentTrackingOrder?.id]);
@@ -143,18 +166,30 @@ export function CartProvider({ children }) {
 
   // Update order status (used by Vendor and Driver dashboards)
   const updateOrderStatus = (orderId, newStatus, extraData = {}) => {
-    setOrders((prev) =>
-      prev.map((ord) => {
+    setOrders((prev) => {
+      const updatedList = prev.map((ord) => {
         if (ord.id === orderId) {
-          const updated = { ...ord, status: newStatus, ...extraData };
-          if (currentTrackingOrder?.id === orderId) {
-            setCurrentTrackingOrder(updated);
-          }
-          return updated;
+          return { ...ord, status: newStatus, ...extraData };
         }
         return ord;
-      })
-    );
+      });
+      // Sync across browser tabs
+      localStorage.setItem('qd_orders_live', JSON.stringify(updatedList));
+      return updatedList;
+    });
+
+    if (currentTrackingOrder?.id === orderId) {
+      setCurrentTrackingOrder((prev) => ({ ...prev, status: newStatus, ...extraData }));
+    }
+
+    // Emit live WebSocket event to backend (Section 8)
+    if (socket && socket.connected) {
+      socket.emit('order:update_status', {
+        orderId,
+        status: newStatus,
+        updatedOrder: extraData,
+      });
+    }
   };
 
   // Update product stock and price (Vendor Inventory View 6)

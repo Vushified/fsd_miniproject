@@ -43,3 +43,4 @@ jobs:
         run: |
           ls -la client/dist
           echo "Production build passed successfully!"
+

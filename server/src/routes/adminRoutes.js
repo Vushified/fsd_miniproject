@@ -17,3 +17,4 @@ router.get('/vendors', getVendorRequests);
 router.put('/vendors/:id/verify', verifyVendor);
 
 export default router;
+

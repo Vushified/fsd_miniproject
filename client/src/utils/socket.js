@@ -8,3 +8,4 @@ export const socket = io(SOCKET_URL, {
   autoConnect: false, // Connect on demand
   transports: ['websocket', 'polling'],
 });
+

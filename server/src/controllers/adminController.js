@@ -68,3 +68,4 @@ export const verifyVendor = async (req, res, next) => {
     next(error);
   }
 };
+

@@ -18,3 +18,4 @@ router.route('/:id')
   .put(protect, authorize('vendor', 'admin'), updateStore);
 
 export default router;
+
