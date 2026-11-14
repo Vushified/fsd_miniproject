@@ -214,16 +214,6 @@ export function AppContent() {
         notification={notification}
         onClose={() => setNotification(null)}
       />
-
-      {/* Clean Minimalist Footer */}
-      <footer className="border-t border-neutral-200 dark:border-neutral-800 bg-white/50 dark:bg-neutral-900/50 py-5 text-center text-xs text-neutral-400">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p>© 2026 QuickDrop Technologies Inc. All rights reserved.</p>
-          <p className="text-[11px] text-neutral-400">
-            Secure 256-bit SSL • Real-time WebSockets • Role-Based Access Control
-          </p>
-        </div>
-      </footer>
     </div>
   );
 }
