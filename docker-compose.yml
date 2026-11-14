@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  # MongoDB Database Service
+  mongodb:
+    image: mongo:latest
+    container_name: quickdrop_mongodb
+    restart: always
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - quickdrop-net
+
+  # Express Node.js Backend Service
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: quickdrop_backend
+    restart: always
+    ports:
+      - '5000:5000'
+    environment:
+      - PORT=5000
+      - NODE_ENV=production
+      - MONGO_URI=mongodb://mongodb:27017/fsd_project
+      - JWT_SECRET=quickdrop_super_secret_jwt_key_2026_fsd
+      - CLIENT_URL=http://localhost:3000
+    depends_on:
+      - mongodb
+    networks:
+      - quickdrop-net
+
+  # React Frontend Service (Served via Nginx)
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: quickdrop_frontend
+    restart: always
+    ports:
+      - '3000:80'
+    depends_on:
+      - server
+    networks:
+      - quickdrop-net
+
+networks:
+  quickdrop-net:
+    driver: bridge
+
+volumes:
+  mongo_data:
+    driver: local
