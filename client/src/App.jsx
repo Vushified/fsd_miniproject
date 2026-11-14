@@ -16,28 +16,34 @@ import { useAuth } from './context/AuthContext';
 import { ShieldAlert, ArrowLeft } from 'lucide-react';
 
 export function AppContent() {
-  const { role, isAuthenticated } = useAuth();
+  const { role, user, isAuthenticated } = useAuth();
   const { setSelectedStoreId, setCurrentTrackingOrder } = useCart();
 
-  // Active view state
+  // Active view state: dynamically defaults based on user role
   const [activeView, setActiveView] = useState(() => {
-    return isAuthenticated ? (role === 'admin' ? 'admin-dashboard' : role === 'vendor' ? 'vendor-orders' : role === 'driver' ? 'driver-dashboard' : 'customer-home') : 'auth';
+    const currentRole = role || 'customer';
+    if (currentRole === 'vendor') return 'vendor-orders';
+    if (currentRole === 'driver') return 'driver-dashboard';
+    if (currentRole === 'admin') return 'admin-dashboard';
+    return 'customer-home';
   });
 
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [notification, setNotification] = useState(null);
 
-  // Sync active view whenever role changes (e.g. on login or logout)
+  // When role changes (e.g. user signs into a different account), navigate to their role dashboard
   useEffect(() => {
-    if (!isAuthenticated) {
-      setActiveView('auth');
+    if (role === 'admin') {
+      setActiveView('admin-dashboard');
+    } else if (role === 'vendor') {
+      setActiveView('vendor-orders');
+    } else if (role === 'driver') {
+      setActiveView('driver-dashboard');
     } else {
-      if (role === 'admin') setActiveView('admin-dashboard');
-      else if (role === 'vendor') setActiveView('vendor-orders');
-      else if (role === 'driver') setActiveView('driver-dashboard');
-      else setActiveView('customer-home');
+      // Customer
+      setActiveView('customer-home');
     }
-  }, [role, isAuthenticated]);
+  }, [role]);
 
   const notify = (message, type = 'success') => {
     setNotification({ message, type });
@@ -51,11 +57,6 @@ export function AppContent() {
   };
 
   const handleProceedToCheckout = () => {
-    if (!isAuthenticated) {
-      notify('Please sign in to proceed with checkout', 'info');
-      setActiveView('auth');
-      return;
-    }
     setActiveView('checkout');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -68,7 +69,7 @@ export function AppContent() {
   };
 
   const handleLoginSuccess = (userRole) => {
-    notify(`Signed in successfully as ${userRole}`, 'success');
+    notify(`Authenticated as ${userRole}`, 'success');
     if (userRole === 'admin') setActiveView('admin-dashboard');
     else if (userRole === 'vendor') setActiveView('vendor-orders');
     else if (userRole === 'driver') setActiveView('driver-dashboard');
@@ -85,16 +86,16 @@ export function AppContent() {
         onOpenCart={() => setIsCartOpen(true)}
       />
 
-      {/* Main Content Area with Protected Routes */}
+      {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         
-        {/* Authentication Page (Login / Register) */}
+        {/* Full-Screen Login / Register Page (shown when activeView === 'auth') */}
         {activeView === 'auth' && (
           <AuthPage onLoginSuccess={handleLoginSuccess} />
         )}
 
         {/* =========================================
-            1. CUSTOMER ROUTES (Only for customer or guest)
+            1. CUSTOMER DASHBOARD & VIEWS (Role: Customer)
             ========================================= */}
         {activeView === 'customer-home' && (
           <CustomerHome onSelectStore={handleSelectStore} />
@@ -108,14 +109,10 @@ export function AppContent() {
         )}
 
         {activeView === 'checkout' && (
-          isAuthenticated ? (
-            <CheckoutPage
-              onBack={() => setActiveView('store-catalog')}
-              onOrderPlaced={handleOrderPlaced}
-            />
-          ) : (
-            <AuthPage onLoginSuccess={handleLoginSuccess} />
-          )
+          <CheckoutPage
+            onBack={() => setActiveView('store-catalog')}
+            onOrderPlaced={handleOrderPlaced}
+          />
         )}
 
         {activeView === 'order-tracking' && (
@@ -125,7 +122,7 @@ export function AppContent() {
         )}
 
         {/* =========================================
-            2. VENDOR ROUTES (Protected: Only vendor or admin)
+            2. VENDOR DASHBOARD & VIEWS (Role: Vendor)
             ========================================= */}
         {activeView === 'vendor-orders' && (
           role === 'vendor' || role === 'admin' ? (
@@ -133,7 +130,7 @@ export function AppContent() {
               onNavigateToInventory={() => setActiveView('vendor-inventory')}
             />
           ) : (
-            <AccessDenied onBack={() => setActiveView('customer-home')} requiredRole="Vendor" />
+            <AccessDenied onBack={() => setActiveView('customer-home')} requiredRole="Store Vendor" />
           )
         )}
 
@@ -143,12 +140,12 @@ export function AppContent() {
               onBackToOrders={() => setActiveView('vendor-orders')}
             />
           ) : (
-            <AccessDenied onBack={() => setActiveView('customer-home')} requiredRole="Vendor" />
+            <AccessDenied onBack={() => setActiveView('customer-home')} requiredRole="Store Vendor" />
           )
         )}
 
         {/* =========================================
-            3. DELIVERY PARTNER ROUTES (Protected: Only driver or admin)
+            3. DELIVERY PARTNER DASHBOARD (Role: Driver)
             ========================================= */}
         {activeView === 'driver-dashboard' && (
           role === 'driver' || role === 'admin' ? (
@@ -159,7 +156,7 @@ export function AppContent() {
         )}
 
         {/* =========================================
-            4. ADMIN ROUTES (Protected: Strictly Admin Only)
+            4. ADMIN DASHBOARD (Role: Admin)
             ========================================= */}
         {activeView === 'admin-dashboard' && (
           role === 'admin' ? (
@@ -183,7 +180,7 @@ export function AppContent() {
         onClose={() => setNotification(null)}
       />
 
-      {/* Clean Professional Minimalist Footer */}
+      {/* Clean Minimalist Footer */}
       <footer className="border-t border-neutral-200 dark:border-neutral-800 bg-white/50 dark:bg-neutral-900/50 py-5 text-center text-xs text-neutral-400">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <p>© 2026 QuickDrop Technologies Inc. All rights reserved.</p>

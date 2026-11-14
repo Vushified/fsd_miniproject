@@ -4,25 +4,57 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  // Read authenticated user & JWT token from localStorage
+  // Preset accounts for the 4 roles
+  const accounts = {
+    customer: {
+      id: 'usr-customer',
+      name: 'Vidushi Singh',
+      email: 'vidushi@example.com',
+      role: 'customer',
+      token: 'jwt-token-customer-2026',
+    },
+    vendor: {
+      id: 'usr-vendor',
+      name: 'FreshBasket Vendor',
+      email: 'vendor@example.com',
+      role: 'vendor',
+      token: 'jwt-token-vendor-2026',
+    },
+    driver: {
+      id: 'usr-driver',
+      name: 'Ramesh Sharma',
+      email: 'driver@example.com',
+      role: 'driver',
+      token: 'jwt-token-driver-2026',
+    },
+    admin: {
+      id: 'usr-admin',
+      name: 'System Admin (Vidushi)',
+      email: 'admin@example.com',
+      role: 'admin',
+      token: 'jwt-token-admin-2026',
+    },
+  };
+
+  // Read saved user or default to Customer
   const [user, setUser] = useState(() => {
     try {
       const saved = localStorage.getItem('qd_user');
-      return saved ? JSON.parse(saved) : null;
+      return saved ? JSON.parse(saved) : accounts.customer;
     } catch {
-      return null;
+      return accounts.customer;
     }
   });
 
   const [token, setToken] = useState(() => {
-    return localStorage.getItem('qd_token') || null;
+    return localStorage.getItem('qd_token') || 'jwt-token-customer-2026';
   });
 
-  // Keep local storage in sync
+  // Sync to local storage
   useEffect(() => {
-    if (user && token) {
+    if (user) {
       localStorage.setItem('qd_user', JSON.stringify(user));
-      localStorage.setItem('qd_token', token);
+      localStorage.setItem('qd_token', user.token || token || 'jwt-token-2026');
     } else {
       localStorage.removeItem('qd_user');
       localStorage.removeItem('qd_token');
@@ -30,11 +62,23 @@ export function AuthProvider({ children }) {
   }, [user, token]);
 
   const login = (userData, jwtToken) => {
-    setUser(userData);
-    setToken(jwtToken || userData.token || 'mock-jwt-token');
+    const userWithToken = {
+      ...userData,
+      token: jwtToken || userData.token || 'jwt-token-2026',
+    };
+    setUser(userWithToken);
+    setToken(userWithToken.token);
+  };
+
+  // Quick switch role / account (essential for two-window demo & viva evaluation)
+  const switchRole = (newRole) => {
+    const selected = accounts[newRole] || accounts.customer;
+    setUser(selected);
+    setToken(selected.token);
   };
 
   const logout = () => {
+    // Return to guest customer
     setUser(null);
     setToken(null);
     localStorage.removeItem('qd_user');
@@ -45,11 +89,12 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider
       value={{
         user,
-        token,
-        role: user?.role || null,
+        token: user?.token || token,
+        role: user?.role || 'customer',
         isAuthenticated: !!user,
         login,
         logout,
+        switchRole,
       }}
     >
       {children}
