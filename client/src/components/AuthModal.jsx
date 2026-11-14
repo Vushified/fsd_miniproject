@@ -283,3 +283,4 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess }) {
     </div>
   );
 }
+

@@ -25,9 +25,11 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Temp extraction files
+# Temp extraction files & college PDFs
 clean_assignment.txt
 extracted_assignment.txt
 full_extracted_assignment.txt
 summary_assignment.txt
+project_info/
+*.pdf
 
