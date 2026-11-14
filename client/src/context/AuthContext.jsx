@@ -1,58 +1,57 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-// Context for user authentication and role management
+// Context for user authentication, JWT tokens, and Role-Based Access Control (RBAC)
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  // Current active user
+  // Read authenticated user & JWT token from localStorage
   const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('qd_user');
-    return saved
-      ? JSON.parse(saved)
-      : {
-          id: 'usr-1',
-          name: 'Vidushi Singh',
-          email: 'vidushi@example.com',
-          role: 'customer', // customer, vendor, driver, admin
-          token: 'mock-jwt-token',
-        };
+    try {
+      const saved = localStorage.getItem('qd_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [token, setToken] = useState(() => {
+    return localStorage.getItem('qd_token') || null;
   });
 
   // Keep local storage in sync
   useEffect(() => {
-    if (user) {
+    if (user && token) {
       localStorage.setItem('qd_user', JSON.stringify(user));
+      localStorage.setItem('qd_token', token);
     } else {
       localStorage.removeItem('qd_user');
+      localStorage.removeItem('qd_token');
     }
-  }, [user]);
+  }, [user, token]);
 
-  // Quick switch role (super helpful for testing all 8 views and viva evaluation)
-  const switchRole = (newRole) => {
-    setUser((prev) => ({
-      ...prev,
-      role: newRole,
-      name:
-        newRole === 'vendor'
-          ? 'FreshBasket Vendor'
-          : newRole === 'driver'
-          ? 'Ramesh Driver'
-          : newRole === 'admin'
-          ? 'Admin Vidushi'
-          : 'Vidushi Singh',
-    }));
-  };
-
-  const login = (userData) => {
+  const login = (userData, jwtToken) => {
     setUser(userData);
+    setToken(jwtToken || userData.token || 'mock-jwt-token');
   };
 
   const logout = () => {
     setUser(null);
+    setToken(null);
+    localStorage.removeItem('qd_user');
+    localStorage.removeItem('qd_token');
   };
 
   return (
-    <AuthContext.Provider value={{ user, role: user?.role || 'customer', login, logout, switchRole }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        role: user?.role || null,
+        isAuthenticated: !!user,
+        login,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -65,4 +64,3 @@ export function useAuth() {
   }
   return context;
 }
-
