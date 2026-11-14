@@ -8,7 +8,7 @@ import { VendorOrders } from './pages/VendorOrders';
 import { VendorInventory } from './pages/VendorInventory';
 import { DriverDashboard } from './pages/DriverDashboard';
 import { AdminDashboard } from './pages/AdminDashboard';
-import { AuthPage } from './pages/AuthPage';
+import { AuthModal } from './components/AuthModal';
 import { CartDrawer } from './components/CartDrawer';
 import { Toast } from './components/Toast';
 import { useCart } from './context/CartContext';
@@ -16,34 +16,32 @@ import { useAuth } from './context/AuthContext';
 import { ShieldAlert, ArrowLeft } from 'lucide-react';
 
 export function AppContent() {
-  const { role, user, isAuthenticated } = useAuth();
+  const { role, user, isAuthenticated, logout } = useAuth();
   const { setSelectedStoreId, setCurrentTrackingOrder } = useCart();
 
-  // Active view state: dynamically defaults based on user role
+  // Active view: Defaults to customer landing page
   const [activeView, setActiveView] = useState(() => {
-    const currentRole = role || 'customer';
-    if (currentRole === 'vendor') return 'vendor-orders';
-    if (currentRole === 'driver') return 'driver-dashboard';
-    if (currentRole === 'admin') return 'admin-dashboard';
+    if (role === 'admin') return 'admin-dashboard';
+    if (role === 'vendor') return 'vendor-orders';
+    if (role === 'driver') return 'driver-dashboard';
     return 'customer-home';
   });
 
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [notification, setNotification] = useState(null);
 
-  // When role changes (e.g. user signs into a different account), navigate to their role dashboard
+  // Sync view when role changes on login or logout
   useEffect(() => {
-    if (role === 'admin') {
-      setActiveView('admin-dashboard');
-    } else if (role === 'vendor') {
-      setActiveView('vendor-orders');
-    } else if (role === 'driver') {
-      setActiveView('driver-dashboard');
+    if (isAuthenticated) {
+      if (role === 'admin') setActiveView('admin-dashboard');
+      else if (role === 'vendor') setActiveView('vendor-orders');
+      else if (role === 'driver') setActiveView('driver-dashboard');
+      else setActiveView('customer-home');
     } else {
-      // Customer
       setActiveView('customer-home');
     }
-  }, [role]);
+  }, [role, isAuthenticated]);
 
   const notify = (message, type = 'success') => {
     setNotification({ message, type });
@@ -57,6 +55,11 @@ export function AppContent() {
   };
 
   const handleProceedToCheckout = () => {
+    if (!isAuthenticated) {
+      notify('Please sign in to proceed with checkout', 'info');
+      setIsAuthModalOpen(true);
+      return;
+    }
     setActiveView('checkout');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -68,8 +71,9 @@ export function AppContent() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Called when JWT login succeeds in AuthModal
   const handleLoginSuccess = (userRole) => {
-    notify(`Authenticated as ${userRole}`, 'success');
+    notify(`Welcome back! Signed in as ${userRole}`, 'success');
     if (userRole === 'admin') setActiveView('admin-dashboard');
     else if (userRole === 'vendor') setActiveView('vendor-orders');
     else if (userRole === 'driver') setActiveView('driver-dashboard');
@@ -79,23 +83,19 @@ export function AppContent() {
   return (
     <div className="min-h-screen bg-brand-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 flex flex-col font-sans transition-colors duration-200">
       
-      {/* Navigation Header */}
+      {/* Real-World Navigation Header */}
       <Navbar
         activeView={activeView}
         setActiveView={setActiveView}
         onOpenCart={() => setIsCartOpen(true)}
+        onOpenAuthModal={() => setIsAuthModalOpen(true)}
       />
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         
-        {/* Full-Screen Login / Register Page (shown when activeView === 'auth') */}
-        {activeView === 'auth' && (
-          <AuthPage onLoginSuccess={handleLoginSuccess} />
-        )}
-
         {/* =========================================
-            1. CUSTOMER DASHBOARD & VIEWS (Role: Customer)
+            1. PUBLIC STOREFRONT / CUSTOMER VIEWS
             ========================================= */}
         {activeView === 'customer-home' && (
           <CustomerHome onSelectStore={handleSelectStore} />
@@ -109,10 +109,22 @@ export function AppContent() {
         )}
 
         {activeView === 'checkout' && (
-          <CheckoutPage
-            onBack={() => setActiveView('store-catalog')}
-            onOrderPlaced={handleOrderPlaced}
-          />
+          isAuthenticated ? (
+            <CheckoutPage
+              onBack={() => setActiveView('store-catalog')}
+              onOrderPlaced={handleOrderPlaced}
+            />
+          ) : (
+            <div className="text-center py-20 space-y-4">
+              <p className="text-sm text-neutral-500">Please sign in to complete your checkout.</p>
+              <button
+                onClick={() => setIsAuthModalOpen(true)}
+                className="px-5 py-2.5 bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 rounded-xl text-xs font-bold shadow-md"
+              >
+                Sign In Now
+              </button>
+            </div>
+          )
         )}
 
         {activeView === 'order-tracking' && (
@@ -122,7 +134,7 @@ export function AppContent() {
         )}
 
         {/* =========================================
-            2. VENDOR DASHBOARD & VIEWS (Role: Vendor)
+            2. VENDOR DASHBOARD (Protected: Role 'vendor' or 'admin')
             ========================================= */}
         {activeView === 'vendor-orders' && (
           role === 'vendor' || role === 'admin' ? (
@@ -130,7 +142,11 @@ export function AppContent() {
               onNavigateToInventory={() => setActiveView('vendor-inventory')}
             />
           ) : (
-            <AccessDenied onBack={() => setActiveView('customer-home')} requiredRole="Store Vendor" />
+            <AccessDenied 
+              onBack={() => setActiveView('customer-home')} 
+              onOpenAuth={() => setIsAuthModalOpen(true)}
+              requiredRole="Store Vendor" 
+            />
           )
         )}
 
@@ -140,32 +156,51 @@ export function AppContent() {
               onBackToOrders={() => setActiveView('vendor-orders')}
             />
           ) : (
-            <AccessDenied onBack={() => setActiveView('customer-home')} requiredRole="Store Vendor" />
+            <AccessDenied 
+              onBack={() => setActiveView('customer-home')} 
+              onOpenAuth={() => setIsAuthModalOpen(true)}
+              requiredRole="Store Vendor" 
+            />
           )
         )}
 
         {/* =========================================
-            3. DELIVERY PARTNER DASHBOARD (Role: Driver)
+            3. DELIVERY PARTNER DASHBOARD (Protected: Role 'driver' or 'admin')
             ========================================= */}
         {activeView === 'driver-dashboard' && (
           role === 'driver' || role === 'admin' ? (
             <DriverDashboard />
           ) : (
-            <AccessDenied onBack={() => setActiveView('customer-home')} requiredRole="Delivery Partner" />
+            <AccessDenied 
+              onBack={() => setActiveView('customer-home')} 
+              onOpenAuth={() => setIsAuthModalOpen(true)}
+              requiredRole="Delivery Partner" 
+            />
           )
         )}
 
         {/* =========================================
-            4. ADMIN DASHBOARD (Role: Admin)
+            4. ADMIN DASHBOARD (Protected: Role 'admin' strictly)
             ========================================= */}
         {activeView === 'admin-dashboard' && (
           role === 'admin' ? (
             <AdminDashboard />
           ) : (
-            <AccessDenied onBack={() => setActiveView('customer-home')} requiredRole="System Admin" />
+            <AccessDenied 
+              onBack={() => setActiveView('customer-home')} 
+              onOpenAuth={() => setIsAuthModalOpen(true)}
+              requiredRole="System Admin" 
+            />
           )
         )}
       </main>
+
+      {/* Role-Based JWT Auth Modal (Opened from Sign In button) */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onLoginSuccess={handleLoginSuccess}
+      />
 
       {/* Slide-over Cart Drawer */}
       <CartDrawer
@@ -193,8 +228,8 @@ export function AppContent() {
   );
 }
 
-// Access Denied (403 Forbidden) Component for Unauthorized Roles
-function AccessDenied({ onBack, requiredRole }) {
+// Access Denied Component for Protected Routes
+function AccessDenied({ onBack, onOpenAuth, requiredRole }) {
   return (
     <div className="max-w-md mx-auto text-center py-20 space-y-4 animate-fade-in">
       <div className="w-14 h-14 rounded-2xl bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-400 flex items-center justify-center mx-auto shadow-sm">
@@ -204,15 +239,23 @@ function AccessDenied({ onBack, requiredRole }) {
         403 - Access Forbidden
       </h2>
       <p className="text-xs text-neutral-500 leading-relaxed">
-        Your current account role does not have authorization to access the <strong>{requiredRole}</strong> portal.
+        You must be signed in as an authorized <strong>{requiredRole}</strong> to access this dashboard.
       </p>
-      <button
-        onClick={onBack}
-        className="px-4 py-2 bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 rounded-xl text-xs font-semibold hover:opacity-90 transition flex items-center gap-1.5 mx-auto"
-      >
-        <ArrowLeft className="w-3.5 h-3.5" />
-        Return to My Dashboard
-      </button>
+      <div className="flex justify-center gap-3 pt-2">
+        <button
+          onClick={onBack}
+          className="px-4 py-2 border border-neutral-300 dark:border-neutral-700 rounded-xl text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:border-black dark:hover:border-white transition flex items-center gap-1.5"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Browse Storefront
+        </button>
+        <button
+          onClick={onOpenAuth}
+          className="px-4 py-2 bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 rounded-xl text-xs font-bold hover:opacity-90 transition shadow-sm"
+        >
+          Sign In as {requiredRole}
+        </button>
+      </div>
     </div>
   );
 }

@@ -4,81 +4,43 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  // Preset accounts for the 4 roles
-  const accounts = {
-    customer: {
-      id: 'usr-customer',
-      name: 'Vidushi Singh',
-      email: 'vidushi@example.com',
-      role: 'customer',
-      token: 'jwt-token-customer-2026',
-    },
-    vendor: {
-      id: 'usr-vendor',
-      name: 'FreshBasket Vendor',
-      email: 'vendor@example.com',
-      role: 'vendor',
-      token: 'jwt-token-vendor-2026',
-    },
-    driver: {
-      id: 'usr-driver',
-      name: 'Ramesh Sharma',
-      email: 'driver@example.com',
-      role: 'driver',
-      token: 'jwt-token-driver-2026',
-    },
-    admin: {
-      id: 'usr-admin',
-      name: 'System Admin (Vidushi)',
-      email: 'admin@example.com',
-      role: 'admin',
-      token: 'jwt-token-admin-2026',
-    },
-  };
-
-  // Read saved user or default to Customer
+  // Read saved authenticated user and JWT token from localStorage
   const [user, setUser] = useState(() => {
     try {
       const saved = localStorage.getItem('qd_user');
-      return saved ? JSON.parse(saved) : accounts.customer;
+      return saved ? JSON.parse(saved) : null;
     } catch {
-      return accounts.customer;
+      return null;
     }
   });
 
   const [token, setToken] = useState(() => {
-    return localStorage.getItem('qd_token') || 'jwt-token-customer-2026';
+    return localStorage.getItem('qd_token') || null;
   });
 
-  // Sync to local storage
+  // Sync state to browser localStorage
   useEffect(() => {
-    if (user) {
+    if (user && token) {
       localStorage.setItem('qd_user', JSON.stringify(user));
-      localStorage.setItem('qd_token', user.token || token || 'jwt-token-2026');
+      localStorage.setItem('qd_token', token);
     } else {
       localStorage.removeItem('qd_user');
       localStorage.removeItem('qd_token');
     }
   }, [user, token]);
 
+  // Login handler saves real JWT token and user profile
   const login = (userData, jwtToken) => {
-    const userWithToken = {
+    const userPayload = {
       ...userData,
-      token: jwtToken || userData.token || 'jwt-token-2026',
+      token: jwtToken || userData.token || 'jwt-token-active',
     };
-    setUser(userWithToken);
-    setToken(userWithToken.token);
+    setUser(userPayload);
+    setToken(userPayload.token);
   };
 
-  // Quick switch role / account (essential for two-window demo & viva evaluation)
-  const switchRole = (newRole) => {
-    const selected = accounts[newRole] || accounts.customer;
-    setUser(selected);
-    setToken(selected.token);
-  };
-
+  // Sign out clears JWT token
   const logout = () => {
-    // Return to guest customer
     setUser(null);
     setToken(null);
     localStorage.removeItem('qd_user');
@@ -89,12 +51,11 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider
       value={{
         user,
-        token: user?.token || token,
-        role: user?.role || 'customer',
+        token,
+        role: user?.role || null,
         isAuthenticated: !!user,
         login,
         logout,
-        switchRole,
       }}
     >
       {children}

@@ -4,26 +4,25 @@ import {
   MapPin, 
   Sun, 
   Moon, 
+  LogOut, 
   User, 
   Store, 
   Truck, 
   ShieldCheck, 
   Boxes, 
   Package, 
-  LogIn,
-  ChevronDown
+  LogIn 
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 
-export function Navbar({ activeView, setActiveView, onOpenCart }) {
+export function Navbar({ activeView, setActiveView, onOpenCart, onOpenAuthModal }) {
   const { cartItemCount, customerLocation, setCustomerLocation } = useCart();
   const { darkMode, toggleTheme } = useTheme();
-  const { user, role, switchRole } = useAuth();
+  const { user, role, isAuthenticated, logout } = useAuth();
   
   const [locationModalOpen, setLocationModalOpen] = useState(false);
-  const [roleMenuOpen, setRoleMenuOpen] = useState(false);
 
   const availableLocations = [
     'Bandra West, Mumbai',
@@ -33,21 +32,16 @@ export function Navbar({ activeView, setActiveView, onOpenCart }) {
     'Andheri East, Mumbai',
   ];
 
-  // Distinct roles for authorization
-  const rolesList = [
-    { id: 'customer', label: 'Customer', name: 'Vidushi Singh', icon: User, desc: 'Shop groceries & track delivery' },
-    { id: 'vendor', label: 'Store Vendor', name: 'FreshBasket Vendor', icon: Store, desc: 'Pack orders & manage inventory' },
-    { id: 'driver', label: 'Delivery Partner', name: 'Ramesh Sharma', icon: Truck, desc: 'Accept orders & navigate routes' },
-    { id: 'admin', label: 'System Admin', name: 'System Admin', icon: ShieldCheck, desc: 'Platform oversight & approvals' },
-  ];
-
-  const currentRoleInfo = rolesList.find((r) => r.id === role) || rolesList[0];
-  const CurrentIcon = currentRoleInfo.icon;
-
-  const handleRoleSelect = (newRole) => {
-    switchRole(newRole);
-    setRoleMenuOpen(false);
+  // Role badges with distinct minimalist styles
+  const roleBadges = {
+    customer: { label: 'Customer', icon: User, color: 'bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200' },
+    vendor: { label: 'Store Vendor', icon: Store, color: 'bg-blue-100 text-blue-900 dark:bg-blue-950 dark:text-blue-300' },
+    driver: { label: 'Delivery Partner', icon: Truck, color: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300' },
+    admin: { label: 'System Admin', icon: ShieldCheck, color: 'bg-purple-100 text-purple-900 dark:bg-purple-950 dark:text-purple-300' },
   };
+
+  const currentBadge = role ? roleBadges[role] : null;
+  const RoleIcon = currentBadge?.icon || User;
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 dark:bg-neutral-900/95 backdrop-blur border-b border-neutral-200 dark:border-neutral-800 transition-colors">
@@ -81,8 +75,8 @@ export function Navbar({ activeView, setActiveView, onOpenCart }) {
               </div>
             </button>
 
-            {/* Location Selector (Only for customer) */}
-            {role === 'customer' && (
+            {/* Location Selector (Public storefront or customer) */}
+            {(!role || role === 'customer') && (
               <div className="relative hidden md:block ml-4 pl-4 border-l border-neutral-200 dark:border-neutral-800">
                 <button
                   onClick={() => setLocationModalOpen(!locationModalOpen)}
@@ -122,33 +116,8 @@ export function Navbar({ activeView, setActiveView, onOpenCart }) {
             )}
           </div>
 
-          {/* Center Links: Contextual to the logged in role */}
+          {/* Center Navigation Links: Dynamic based on authorization */}
           <nav className="hidden sm:flex items-center gap-2">
-            {role === 'customer' && (
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setActiveView('customer-home')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                    activeView === 'customer-home'
-                      ? 'text-neutral-950 dark:text-white underline underline-offset-4'
-                      : 'text-neutral-500 hover:text-black dark:hover:text-white'
-                  }`}
-                >
-                  Stores & Groceries
-                </button>
-                <button
-                  onClick={() => setActiveView('order-tracking')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                    activeView === 'order-tracking'
-                      ? 'text-neutral-950 dark:text-white underline underline-offset-4'
-                      : 'text-neutral-500 hover:text-black dark:hover:text-white'
-                  }`}
-                >
-                  Live Tracking
-                </button>
-              </div>
-            )}
-
             {role === 'vendor' && (
               <div className="flex p-1 bg-neutral-100 dark:bg-neutral-800 rounded-xl border border-neutral-200 dark:border-neutral-700">
                 <button
@@ -160,7 +129,7 @@ export function Navbar({ activeView, setActiveView, onOpenCart }) {
                   }`}
                 >
                   <Package className="w-3.5 h-3.5" />
-                  Orders Checklist
+                  Orders
                 </button>
                 <button
                   onClick={() => setActiveView('vendor-inventory')}
@@ -175,12 +144,37 @@ export function Navbar({ activeView, setActiveView, onOpenCart }) {
                 </button>
               </div>
             )}
+
+            {(!role || role === 'customer') && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setActiveView('customer-home')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                    activeView === 'customer-home'
+                      ? 'text-neutral-950 dark:text-white underline underline-offset-4'
+                      : 'text-neutral-500 hover:text-black dark:hover:text-white'
+                  }`}
+                >
+                  Browse Stores
+                </button>
+                <button
+                  onClick={() => setActiveView('order-tracking')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                    activeView === 'order-tracking'
+                      ? 'text-neutral-950 dark:text-white underline underline-offset-4'
+                      : 'text-neutral-500 hover:text-black dark:hover:text-white'
+                  }`}
+                >
+                  Track Order
+                </button>
+              </div>
+            )}
           </nav>
 
-          {/* Right: Role Switcher / Cart / Theme */}
-          <div className="flex items-center gap-2">
+          {/* Right: Cart, Theme Toggle, Profile or Sign In Button */}
+          <div className="flex items-center gap-2.5">
             
-            {/* Dark / Light Mode */}
+            {/* Dark / Light Mode Toggle */}
             <button
               onClick={toggleTheme}
               aria-label="Toggle theme"
@@ -189,8 +183,8 @@ export function Navbar({ activeView, setActiveView, onOpenCart }) {
               {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
 
-            {/* Cart Button (For customer) */}
-            {role === 'customer' && (
+            {/* Cart Button (for storefront) */}
+            {(!role || role === 'customer') && (
               <button
                 onClick={onOpenCart}
                 className="relative flex items-center gap-2 px-3 py-2 bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 rounded-xl text-xs font-semibold hover:opacity-90 transition active:scale-95 shadow-sm"
@@ -205,64 +199,38 @@ export function Navbar({ activeView, setActiveView, onOpenCart }) {
               </button>
             )}
 
-            {/* Account & Role Switcher Dropdown (Supports Two-Window demo & Viva evaluation) */}
-            <div className="relative">
-              <button
-                onClick={() => setRoleMenuOpen(!roleMenuOpen)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-xs font-bold text-neutral-900 dark:text-white hover:border-black dark:hover:border-white transition shadow-sm"
-              >
-                <CurrentIcon className="w-3.5 h-3.5 text-neutral-900 dark:text-white" />
-                <span className="hidden sm:inline">{user?.name || currentRoleInfo.name}</span>
-                <span className="text-[10px] bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded text-neutral-600 dark:text-neutral-300 font-semibold uppercase">
-                  {currentRoleInfo.label}
-                </span>
-                <ChevronDown className="w-3.5 h-3.5 text-neutral-400" />
-              </button>
-
-              {/* Role Dropdown */}
-              {roleMenuOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-2xl p-2 z-50 space-y-1">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-3 py-1.5">
-                    Switch Authorized Role
-                  </p>
-
-                  {rolesList.map((r) => {
-                    const Icon = r.icon;
-                    const isSelected = role === r.id;
-                    return (
-                      <button
-                        key={r.id}
-                        onClick={() => handleRoleSelect(r.id)}
-                        className={`w-full text-left p-2.5 rounded-xl transition flex items-start gap-2.5 ${
-                          isSelected
-                            ? 'bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 font-bold'
-                            : 'hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300'
-                        }`}
-                      >
-                        <Icon className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                        <div>
-                          <p className="text-xs font-bold leading-tight">{r.label}</p>
-                          <p className="text-[10px] opacity-75">{r.desc}</p>
-                        </div>
-                      </button>
-                    );
-                  })}
-
-                  <div className="pt-1.5 border-t border-neutral-100 dark:border-neutral-800">
-                    <button
-                      onClick={() => {
-                        setActiveView('auth');
-                        setRoleMenuOpen(false);
-                      }}
-                      className="w-full text-left px-3 py-2 text-xs font-semibold text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white flex items-center gap-2 rounded-lg"
-                    >
-                      <LogIn className="w-3.5 h-3.5" />
-                      Sign In with Password / Register
-                    </button>
-                  </div>
+            {/* If Logged In: Show User Profile & Logout Button */}
+            {isAuthenticated ? (
+              <div className="flex items-center gap-2">
+                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-800 text-xs font-semibold ${currentBadge?.color}`}>
+                  <RoleIcon className="w-3.5 h-3.5" />
+                  <span className="hidden md:inline">{user?.name}</span>
+                  <span className="text-[10px] uppercase font-bold opacity-75">
+                    ({currentBadge?.label})
+                  </span>
                 </div>
-              )}
-            </div>
+
+                <button
+                  onClick={() => {
+                    logout();
+                    setActiveView('customer-home');
+                  }}
+                  title="Sign Out"
+                  className="p-2 text-neutral-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl transition"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              /* If Not Logged In: Real-World "Sign In" Button in Navbar! */
+              <button
+                onClick={onOpenAuthModal}
+                className="flex items-center gap-1.5 px-4 py-2 bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 rounded-xl text-xs font-bold hover:opacity-90 transition shadow-sm active:scale-95"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Sign In</span>
+              </button>
+            )}
 
           </div>
         </div>
