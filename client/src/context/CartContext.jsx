@@ -14,7 +14,10 @@ export function CartProvider({ children }) {
   // Stores and products state (allows live stock updates in vendor view)
   const [stores, setStores] = useState(initialStores);
   const [products, setProducts] = useState(initialProducts);
-  const [orders, setOrders] = useState(initialOrders);
+  const [orders, setOrders] = useState(() => {
+    const saved = localStorage.getItem('qd_orders_live');
+    return saved ? JSON.parse(saved) : initialOrders;
+  });
   const [pendingVendors, setPendingVendors] = useState(initialPendingVendors);
 
   // Selected store ID currently being shopped from
@@ -44,6 +47,13 @@ export function CartProvider({ children }) {
   useEffect(() => {
     socket.connect();
 
+    // Sync initial orders from server on connect (works across incognito & any tab)
+    socket.on('orders:sync', (serverOrders) => {
+      if (serverOrders && Array.isArray(serverOrders)) {
+        setOrders(serverOrders);
+      }
+    });
+
     // Listen for live status change broadcasts
     socket.on('order:status_updated', (data) => {
       setOrders((prev) =>
@@ -68,6 +78,16 @@ export function CartProvider({ children }) {
           };
         }
         return prev;
+      });
+    });
+
+    // Listen for live new order broadcasts
+    socket.on('order:created', (newOrder) => {
+      setOrders((prev) => {
+        if (prev.some((o) => o.id === newOrder.id)) return prev;
+        const updated = [newOrder, ...prev];
+        localStorage.setItem('qd_orders_live', JSON.stringify(updated));
+        return updated;
       });
     });
 
@@ -158,9 +178,19 @@ export function CartProvider({ children }) {
       missingItemRefund: null,
     };
 
-    setOrders((prev) => [newOrder, ...prev]);
+    setOrders((prev) => {
+      const updated = [newOrder, ...prev];
+      localStorage.setItem('qd_orders_live', JSON.stringify(updated));
+      return updated;
+    });
     setCurrentTrackingOrder(newOrder);
     clearCart();
+
+    // Broadcast new order via WebSocket
+    if (socket && socket.connected) {
+      socket.emit('order:new', newOrder);
+    }
+
     return newOrder;
   };
 

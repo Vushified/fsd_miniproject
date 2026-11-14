@@ -34,13 +34,72 @@ const io = new Server(server, {
 // Attach io to express app so controllers can emit events
 app.set('socketio', io);
 
+// In-memory synced live orders across all browser sessions (Customer, Vendor, Driver)
+let sharedLiveOrders = [
+  {
+    id: 'ORD-9281',
+    customerName: 'Vidushi Singh',
+    customerPhone: '+91 98765 43210',
+    storeId: 'store-1',
+    storeName: 'Fresh Basket QuickMart',
+    items: [
+      { id: 'prod-1', name: 'Tata Sampann High Protein Toor Dal', quantity: 1, price: 185, available: true },
+      { id: 'prod-2', name: 'Fortune Sunlite Refined Sunflower Oil', quantity: 2, price: 145, available: true },
+      { id: 'prod-4', name: 'Amul Taaza Milk 500ml', quantity: 2, price: 33, available: true },
+    ],
+    totalAmount: 541,
+    paymentMethod: 'UPI',
+    paymentStatus: 'Paid',
+    status: 'Packing',
+    deliveryAddress: 'Flat 402, Sea Breeze Apts, Bandra West, Mumbai 400050',
+    driverName: 'Ramesh Sharma',
+    driverPhone: '+91 91234 56789',
+    createdAt: '10:40 AM',
+    estimatedTime: '8 mins',
+    missingItemRefund: null,
+  },
+  {
+    id: 'ORD-9282',
+    customerName: 'Aarav Patel',
+    customerPhone: '+91 98222 33445',
+    storeId: 'store-1',
+    storeName: 'Fresh Basket QuickMart',
+    items: [
+      { id: 'prod-3', name: 'Aashirvaad Shudh Chakki Atta 5kg', quantity: 1, price: 245, available: true },
+    ],
+    totalAmount: 157,
+    paymentMethod: 'COD',
+    paymentStatus: 'Pending',
+    status: 'Placed',
+    deliveryAddress: '12th Floor, Blue Horizon, Khar West, Mumbai',
+    driverName: 'Ramesh Sharma',
+    driverPhone: '+91 91234 56789',
+    createdAt: '10:48 AM',
+    estimatedTime: '14 mins',
+    missingItemRefund: null,
+  },
+];
+
 // Socket.IO Connection & Disconnection Handling (Section 8)
 io.on('connection', (socket) => {
   console.log(`[WebSocket] Client connected: ${socket.id}`);
 
+  // Send current live orders immediately on connection
+  socket.emit('orders:sync', sharedLiveOrders);
+
+  // Broadcast new placed order to vendor & driver in real-time
+  socket.on('order:new', (order) => {
+    console.log(`[WebSocket] New order received: ${order.id}`);
+    sharedLiveOrders = [order, ...sharedLiveOrders.filter((o) => o.id !== order.id)];
+    io.emit('order:created', order);
+  });
+
   // Broadcast order status change to all connected clients (Customer, Vendor, Driver)
   socket.on('order:update_status', (data) => {
     console.log(`[WebSocket] Emitting order status update: Order ${data.orderId} -> ${data.status}`);
+    sharedLiveOrders = sharedLiveOrders.map((ord) =>
+      ord.id === data.orderId ? { ...ord, ...data.updatedOrder, status: data.status } : ord
+    );
     io.emit('order:status_updated', data);
   });
 
